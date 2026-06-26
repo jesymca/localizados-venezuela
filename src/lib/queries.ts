@@ -155,7 +155,7 @@ export async function getLugarBySlug(slug: string, page = 1, limit = 50) {
   const safePage = Math.max(1, page);
 
   const [result] = await Localizado.aggregate<{
-    total: number;
+    total: { n: number }[];
     rows: Record<string, unknown>[];
   }>([
     { $match: { lugarId: lugar._id, ...PUBLISHED } },
