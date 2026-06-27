@@ -17,6 +17,7 @@ const RETRY_BACKOFF_MS = 1_000;
 
 const MSG_RED = "Error de conexión. Verifica tu red e intenta de nuevo.";
 const MSG_TIMEOUT = "Timeout";
+const MSG_ABORT = "Petición cancelada";
 const MSG_PARSE = "Respuesta inválida del servidor";
 
 function sleep(ms: number): Promise<void> {
@@ -41,6 +42,13 @@ function extractHttpError(body: unknown, status: number): ApiErrorData {
   return { error: `Error ${status}`, code: String(status) };
 }
 
+function abortResult(externalSignal?: AbortSignal): ApiResult<never> {
+  if (externalSignal?.aborted) {
+    return { ok: false, error: { error: MSG_ABORT, code: "ABORT" } };
+  }
+  return { ok: false, error: { error: MSG_TIMEOUT, code: "TIMEOUT" } };
+}
+
 async function readResponseBody(
   res: Response
 ): Promise<{ body: unknown; parseError: boolean }> {
@@ -57,10 +65,6 @@ async function readResponseBody(
 
 function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
-}
-
-function isNetworkError(err: unknown): boolean {
-  return err instanceof TypeError;
 }
 
 async function fetchOnce<T>(
@@ -89,12 +93,24 @@ async function fetchOnce<T>(
       headers.set("Content-Type", "application/json");
     }
 
-    const res = await fetch(url, {
-      ...fetchInit,
-      headers,
-      credentials: fetchInit.credentials ?? "include",
-      signal: controller.signal,
-    });
+    let res: Response;
+    try {
+      res = await fetch(url, {
+        ...fetchInit,
+        headers,
+        credentials: fetchInit.credentials ?? "include",
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (isAbortError(err)) {
+        return abortResult(externalSignal ?? undefined);
+      }
+      if (err instanceof TypeError) {
+        return { ok: false, error: { error: MSG_RED, code: "NETWORK" } };
+      }
+      const message = err instanceof Error ? err.message : "Error desconocido";
+      return { ok: false, error: { error: message, code: "UNKNOWN" } };
+    }
 
     const { body, parseError } = await readResponseBody(res);
 
@@ -116,12 +132,6 @@ async function fetchOnce<T>(
 
     return { ok: true, data: (body ?? ({} as T)) as T };
   } catch (err) {
-    if (isAbortError(err)) {
-      return { ok: false, error: { error: MSG_TIMEOUT, code: "TIMEOUT" } };
-    }
-    if (isNetworkError(err)) {
-      return { ok: false, error: { error: MSG_RED, code: "NETWORK" } };
-    }
     const message = err instanceof Error ? err.message : "Error desconocido";
     return { ok: false, error: { error: message, code: "UNKNOWN" } };
   } finally {

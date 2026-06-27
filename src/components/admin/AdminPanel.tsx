@@ -213,7 +213,10 @@ export function AdminPanel() {
   }
 
   async function logout() {
-    await fetchApi("/api/admin/auth/logout", { method: "POST" });
+    await Promise.race([
+      fetchApi("/api/admin/auth/logout", { method: "POST" }),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
     window.location.href = "/admin/login";
   }
 
@@ -385,6 +388,7 @@ function ContribCard({
         {
           method: "POST",
           body: JSON.stringify({ action: "extract" }),
+          timeoutMs: 60_000,
         }
       );
       if (!result.ok) {
