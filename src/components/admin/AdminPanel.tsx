@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDebounce } from "@/lib/hooks/useDebounce";
 
 type Lugar = { id: string; nombre: string; slug: string; totalPublicados: number };
 type Contrib = {
@@ -121,7 +122,8 @@ export function AdminPanel() {
 
   const [filtroEstado, setFiltroEstado] = useState("");
   const [filtroLugar, setFiltroLugar] = useState("");
-  const [filtroQ, setFiltroQ] = useState("");
+  const [filtroQInput, setFiltroQInput] = useState("");
+  const filtroQ = useDebounce(filtroQInput, 300);
   const [verBorrados, setVerBorrados] = useState(false);
 
   const [editPersona, setEditPersona] = useState<Persona | null>(null);
@@ -265,13 +267,13 @@ export function AdminPanel() {
           allSelected={allSelected}
           filtroEstado={filtroEstado}
           filtroLugar={filtroLugar}
-          filtroQ={filtroQ}
+          filtroQ={filtroQInput}
           verBorrados={verBorrados}
           loading={loading}
           editPersona={editPersona}
           onFiltroEstado={setFiltroEstado}
           onFiltroLugar={setFiltroLugar}
-          onFiltroQ={setFiltroQ}
+          onFiltroQ={setFiltroQInput}
           onVerBorrados={setVerBorrados}
           onReload={() => void loadPersonas()}
           onSelectAll={(on) =>
